@@ -1,0 +1,40 @@
+Services Needed
+Everything working on mobile if possible
+
+Single-Sign-On - Keycloak, OpenLDAP (https://github.com/osixia/docker-openldap)
+VPN - OpenVPN (https://hub.docker.com/r/kylemanna/openvpn/)
+Email - https://github.com/cullum/dank-selfhosted , Roundcube, postfix/dovecot, SoGo, https://github.com/tomav/docker-mailserver , https://www.mailpile.is/ , iredmail
+Text Chat - zulip (https://hub.docker.com/r/zulip/docker-zulip/)
+Video Conferencing - https://github.com/vasanthv/hello, https://jitsi.org/jitsi-meet/
+Source Control - Gitlab CE, Gogs, Gitea, Fossil
+CI/CD - drone.io
+Online Document Editor - Cryptpad
+Online Spreadsheet Editor - Ethercalc
+Online Whiteboard - Cryptpad
+Online presentation - Cryptpad
+Offline presentation creation - Libreoffice
+Wiki - https://wiki.js.org/ , gitit
+Calendars - https://radicale.org/ , https://github.com/apple/ccs-calendarserver
+Password Management - Bitwarden
+Project Management - Redmine
+Load balancer for SSL termination - HAproxy
+Diagramming - draw.io
+File sharing - https://www.seafile.com/en/home/
+Holiday Booking - https://github.com/timeoff-management/application
+Offsite Backups - 
+Ticketing -
+
+NextCloud? - offers a number of services
+Cloudogu (https://github.com/cloudogu) - collection of services with SSO built-in
+
+Nice-to-Haves
+
+Bookmark manager - Turtl, https://github.com/kanishka-linux/reminiscence
+S3-compatible object storage - minio.io
+Document backup - https://github.com/danielquinn/paperless
+Music streaming - http://www.subsonic.org/pages/index.jsp , https://koel.phanan.net/
+Note organisation - tagspaces
+Docker image management - https://portainer.io/
+Instapaper reading list - Wallabag
+Forum - Discourse
+Remote Desktop - https://guacamole.apache.org/

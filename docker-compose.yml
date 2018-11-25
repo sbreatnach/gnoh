@@ -1,0 +1,488 @@
+version: "3"
+services:
+  # Message Bus
+  amqp:
+    image: rabbitmq:3.7.7-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+      VIRTUAL_HOST: amqp.glicsoft.com
+      VIRTUAL_PORT: 15672
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq
+      - ./rabbitmq/config/enabled_plugins:/etc/rabbitmq/enabled_plugins
+    networks:
+      selfhosted:
+        ipv4_address: 172.16.33.10
+
+  # Data stores
+  database:
+    image: sbreatnach/postgresql-9.6-extended:1.0.0
+    environment:
+      POSTGRES_DB: zulip
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgresql:/var/lib/postgresql/data
+    networks:
+      selfhosted:
+        ipv4_address: 172.16.33.11
+  memcached:
+    image: memcached:1.5.12-alpine
+    networks:
+      selfhosted:
+        ipv4_address: 172.16.33.12
+  redis:
+    image: redis:4.0.11-alpine
+    volumes:
+      - redis
+    networks:
+      selfhosted:
+        ipv4_address: 172.16.33.13
+
+  chat:
+    image: zulip/docker-zulip:1.9.0-0
+    environment:
+      VIRTUAL_HOST: chat.glicsoft.com
+      DB_HOST: database
+      DB_HOST_PORT: 5432
+      DB_USER: postgres
+      SSL_CERTIFICATE_GENERATION: self-signed
+      SETTING_MEMCACHED_LOCATION: memcached:11211
+      SETTING_RABBITMQ_HOST: amqp
+      SETTING_REDIS_HOST: redis
+      SECRETS_email_password: admin
+      SECRETS_rabbitmq_password: admin
+      SECRETS_postgres_password: postgres
+      SECRETS_secret_key: basd7738473bfsf7834873bfs&&^*fs
+      SETTING_EXTERNAL_HOST: chat.glicsoft.com
+      SETTING_ZULIP_ADMINISTRATOR: admin@glicsoft.com
+      SETTING_EMAIL_HOST: mailserver
+      SETTING_EMAIL_HOST_USER: noreply@glicsoft.com
+      SETTING_EMAIL_PORT: 587
+      # It seems that the email server needs to use ssl or tls and can't be used without it
+      SETTING_EMAIL_USE_SSL: "False"
+      SETTING_EMAIL_USE_TLS: "True"
+      ZULIP_AUTH_BACKENDS: EmailAuthBackend
+      # Uncomment this when configuring the mobile push notifications service
+      # SETTING_PUSH_NOTIFICATION_BOUNCER_URL: 'https://push.zulipchat.com'
+    volumes:
+      - chatdata:/data
+    depends_on:
+      - database
+    networks:
+      selfhosted:
+        ipv4_address: 172.16.33.14
+
+  # Mail
+  webmail:
+    image: rroemhild/mailpile
+    environment:
+      VIRTUAL_HOST: webmail.glicsoft.com
+      VIRTUAL_PORT: 33411
+    volumes:
+      - webmaildata:/root/.local/share/Mailpile
+      - webmailkeys:/root/.gnupg
+    networks:
+      selfhosted:
+        ipv4_address: 172.16.33.15
+  mailserver:
+    image: tvial/docker-mailserver:release-v6.1.0
+    hostname: mail
+    domainname: glicsoft.com
+    ports:
+      - "25:25"
+      - "143:143"
+      - "587:587"
+      - "993:993"
+    volumes:
+      - maildata:/var/mail
+      - mailstate:/var/mail-state
+      - letsencrypt:/etc/letsencrypt
+      #- ./config/:/tmp/docker-mailserver/
+    environment:
+      - ONE_DIR=1
+      - SSL_TYPE=letsencrypt
+      - SPOOF_PROTECTION=1
+      - ENABLE_SRS=1
+      - PERMIT_DOCKER=network
+      - ENABLE_FAIL2BAN=1
+      - ENABLE_LDAP=1
+      - ENABLE_SPAMASSASSIN=1
+      - ENABLE_POSTGREY=1
+      - LDAP_SERVER_HOST=ldap
+      - LDAP_SEARCH_BASE=ou=people,dc=localhost,dc=localdomain
+      - LDAP_BIND_DN=cn=admin,dc=localhost,dc=localdomain
+      - LDAP_BIND_PW=admin
+      - LDAP_QUERY_FILTER_USER=(&(mail=%s)(mailEnabled=TRUE))
+      - LDAP_QUERY_FILTER_GROUP=(&(mailGroupMember=%s)(mailEnabled=TRUE))
+      - LDAP_QUERY_FILTER_ALIAS=(&(mailAlias=%s)(mailEnabled=TRUE))
+      - LDAP_QUERY_FILTER_DOMAIN=(&(|(mail=*@%s)(mailalias=*@%s)(mailGroupMember=*@%s))(mailEnabled=TRUE))
+      - DOVECOT_PASS_FILTER=(&(objectClass=PostfixBookMailAccount)(uniqueIdentifier=%n))
+      - DOVECOT_USER_FILTER=(&(objectClass=PostfixBookMailAccount)(uniqueIdentifier=%n))
+      - ENABLE_SASLAUTHD=1
+      - SASLAUTHD_MECHANISMS=ldap
+      - SASLAUTHD_LDAP_SERVER=ldap
+      - SASLAUTHD_LDAP_BIND_DN=cn=admin,dc=localhost,dc=localdomain
+      - SASLAUTHD_LDAP_PASSWORD=admin
+      - SASLAUTHD_LDAP_SEARCH_BASE=ou=people,dc=localhost,dc=localdomain
+      - POSTMASTER_ADDRESS=postmaster@glicsoft.com
+      - POSTFIX_MESSAGE_SIZE_LIMIT=10000000
+    cap_add:
+      - NET_ADMIN
+      - SYS_PTRACE
+    networks:
+      selfhosted:
+        ipv4_address: 172.16.33.16
+
+  openvpn:
+    image: kylemanna/openvpn:2.3
+    ports:
+      - "1194:1194/udp"
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - ovpn-data:/etc/openvpn
+    networks:
+      selfhosted:
+        ipv4_address: 172.16.33.17
+
+  ldap:
+    image: osixia/openldap:1.2.2
+    ports:
+      - "389:389"
+      - "689:689"
+    volumes:
+      - userdb:/var/lib/ldap
+      - userschema:/etc/ldap/slapd.d
+    networks:
+      selfhosted:
+        ipv4_address: 172.16.33.18
+
+  # Jitsi Meet
+  prosody:
+    image: tiredofit/jitsi-prosody
+    volumes:
+      - letsencrypt:/certs
+    environment:
+      - HOST=meet.glicsoft.com
+      - JITSI_VIDEO_PASS=secret1
+      - JICOFO_PASS=secret2
+      - JICOFO_USER_PASS=secret3
+    networks:
+      selfhosted:
+        ipv4_address: 172.16.33.19
+  jicofo:
+    image: tiredofit/jitsi-jicofo
+    volumes:
+      - letsencrypt:/certs
+    environment:
+      - PROSODY_HOST=prosody
+      - HOST=meet.glicsoft.com
+      - JICOFO_PASS=secret2
+      - JICOFO_USER_PASS=secret3
+    networks:
+      selfhosted:
+        ipv4_address: 172.16.33.20
+  videobridge:
+    image: tiredofit/jitsi-videobridge
+    ports:
+      - 4443:4443
+      - 10000-10100/udp
+    volumes:
+      - letsencrypt:/certs
+    environment:
+      - HOST=meet.glicsoft.com
+      - PROSODY_HOST=prosody
+      - ENABLE_ZABBIX=FALSE
+      - JITSI_VIDEO_PASS=secret1
+      - NETWORK_MODE=NAT
+    networks:
+      selfhosted:
+        ipv4_address: 172.16.33.21
+  meet:
+    image: tiredofit/jitsi-meet
+    volumes:
+      - meetdata:/assets/jitsi-meet
+      - letsencrypt:/certs
+    environment:
+      - VIRTUAL_HOST=meet.glicsoft.com
+      - LETSENCRYPT_HOST=meet.glicsoft.com
+      - LETSENCRYPT_EMAIL=admin@glicsoft.com
+      - JITSI_VIDEO_PASS=secret1
+      - JICOFO_PASS=secret2
+      - JICOFO_USER_PASS=secret3
+      - PROSODY_HOST=prosody
+    networks:
+      selfhosted:
+        ipv4_address: 172.16.33.22
+
+  gitea:
+    image: gitea/gitea:1.6
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      - DB_TYPE=postgres
+      - DB_HOST=database:5432
+      - DB_NAME=gitea
+      - DB_USER=postgres
+      - DB_PASSWD=postgres
+    volumes:
+      - gitea:/data
+    ports:
+      - "3000:3000"
+      - "2222:22"
+    environment:
+      VIRTUAL_HOST: git.glicsoft.com
+      VIRTUAL_PORT: 3000
+    depends_on:
+      - database
+    networks:
+      selfhosted:
+        ipv4_address: 172.16.33.23
+
+  drone:
+    image: drone/drone:1.0.0-rc.1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - cidata:/data
+    environment:
+      - VIRTUAL_HOST=ci.glicsoft.com
+      - DRONE_GITEA_SERVER=gitea
+      - DRONE_GIT_ALWAYS_AUTH=false
+      - DRONE_RUNNER_CAPACITY=2
+      - DRONE_SERVER_HOST=drone
+      - DRONE_SERVER_PROTO=http
+      - DRONE_TLS_AUTOCERT=false
+    networks:
+      selfhosted:
+        ipv4_address: 172.16.33.24
+
+  cryptpad:
+    # FIXME: get newer, official version
+    image: dalareo/cryptpad
+    volumes:
+      - cryptpaddata:/cryptpad/datastore
+    environment:
+      VIRTUAL_HOST: docs.glicsoft.com
+      VIRTUAL_PORT: 3000
+    networks:
+      selfhosted:
+        ipv4_address: 172.16.33.25
+
+  wiki:
+    image: marcelhuberfoo/pandoc-gitit:1.17.2_0.12.1.1-8-gfe50da5
+    volumes:
+      - wikidata:/data
+    environment:
+      - VIRTUAL_HOST=wiki.glicsoft.com
+      - VIRTUAL_PORT=5001
+      - GIT_COMMITTER_NAME="User Name"
+      - GIT_COMMITTER_EMAIL="user@domain.com"
+    networks:
+      selfhosted:
+        ipv4_address: 172.16.33.26
+
+  calendar:
+    image: giorgioazzinnaro/ccs-calendarserver:release_CalendarServer-9.3-dev
+    volumes:
+      - calendardata:/var/db/caldavd
+      - calendarconfig:/etc/caldavd
+    environment:
+      - VIRTUAL_HOST=calendar.glicsoft.com
+      - VIRTUAL_PORT=8008
+      - POSTGRES_HOST=tcp:database:5432
+      - POSTGRES_DB=calendars
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASS=postgres
+      - MEMCACHED_HOST=memcached
+      - MEMCACHED_PORT=11211
+    depends_on:
+      - database
+    networks:
+      selfhosted:
+        ipv4_address: 172.16.33.27
+
+  # Bitwarden
+  mssql:
+    image: bitwarden/mssql:1.27.0
+    container_name: bitwarden-mssql
+    volumes:
+      - mssql:/var/opt/mssql/data
+      #- ../logs/mssql:/var/opt/mssql/log
+      #- ../mssql/backups:/etc/bitwarden/mssql/backups
+    #env_file:
+    #  - mssql.env
+    #  - ../env/uid.env
+    #  - ../env/mssql.override.env
+    networks:
+      selfhosted:
+        ipv4_address: 172.16.33.28
+  web:
+    image: bitwarden/web:2.5.0
+    container_name: bitwarden-web
+    volumes:
+      - bitwardenweb:/etc/bitwarden/web
+    environment:
+      VIRTUAL_HOST: passwords.glicsoft.com
+    #env_file:
+    #  - global.env
+    #  - ../env/uid.env
+    networks:
+      selfhosted:
+        ipv4_address: 172.16.33.29
+  attachments:
+    image: bitwarden/attachments:1.27.0
+    container_name: bitwarden-attachments
+    volumes:
+      - bitwardenattachments:/etc/bitwarden/core/attachments
+    #env_file:
+    #  - global.env
+    #  - ../env/uid.env
+    networks:
+      selfhosted:
+        ipv4_address: 172.16.33.30
+  api:
+    image: bitwarden/api:1.27.0
+    container_name: bitwarden-api
+    volumes:
+      - bitwardencore:/etc/bitwarden/core
+      - bitwardencerts:/etc/bitwarden/ca-certificates
+      #- ../logs/api:/etc/bitwarden/logs
+    #env_file:
+    #  - global.env
+    #  - ../env/uid.env
+    #  - ../env/global.override.env
+    networks:
+      selfhosted:
+        ipv4_address: 172.16.33.31
+  identity:
+    image: bitwarden/identity:1.27.0
+    container_name: bitwarden-identity
+    volumes:
+      - bitwardenidentity:/etc/bitwarden/identity
+      - bitwardencore:/etc/bitwarden/core
+      - bitwardencerts:/etc/bitwarden/ca-certificates
+      #- ../logs/identity:/etc/bitwarden/logs
+    #env_file:
+    #  - global.env
+    #  - ../env/uid.env
+    #  - ../env/global.override.env
+    networks:
+      selfhosted:
+        ipv4_address: 172.16.33.32
+  admin:
+    image: bitwarden/admin:1.27.0
+    container_name: bitwarden-admin
+    volumes:
+      - bitwardencore:/etc/bitwarden/core
+      - bitwardencerts:/etc/bitwarden/ca-certificates
+      #- ../logs/admin:/etc/bitwarden/logs
+    #env_file:
+    #  - global.env
+    #  - ../env/uid.env
+    #  - ../env/global.override.env
+    networks:
+      selfhosted:
+        ipv4_address: 172.16.33.33
+  icons:
+    image: bitwarden/icons:1.27.0
+    container_name: bitwarden-icons
+    volumes:
+      - bitwardencerts:/etc/bitwarden/ca-certificates
+      #- ../logs/icons:/etc/bitwarden/logs
+    #env_file:
+    #  - global.env
+    #  - ../env/uid.env
+    networks:
+      selfhosted:
+        ipv4_address: 172.16.33.34
+  notifications:
+    image: bitwarden/notifications:1.27.0
+    container_name: bitwarden-notifications
+    volumes:
+      - bitwardencerts:/etc/bitwarden/ca-certificates
+      #- ../logs/notifications:/etc/bitwarden/logs
+    #env_file:
+    #  - global.env
+    #  - ../env/uid.env
+    #  - ../env/global.override.env
+    networks:
+      selfhosted:
+        ipv4_address: 172.16.33.35
+
+  redmine:
+    image: redmine:3.4.6
+    volumes:
+      - redminedata:/usr/src/redmine/files
+      - redminesecrets:/usr/src/redmine/config/secrets.yml
+    environment:
+      VIRTUAL_HOST: projects.glicsoft.com
+      VIRTUAL_PORT: 3000
+      REDMINE_DB_POSTGRES: database
+      REDMINE_DB_DATABASE: redmine
+      REDMINE_DB_USERNAME: postgres
+      REDMINE_DB_PASSWORD: postgres
+    depends_on:
+      - database
+
+  # file sharing
+  seafile:
+    image: seafileltd/seafile:6.3.3
+    volumes:
+      - seafiledata:/shared
+    environment:
+      VIRTUAL_HOST: files.glicsoft.com
+      SEAFILE_SERVER_HOSTNAME: files.glicsoft.com
+      
+  nginx-proxy:
+    image: jwilder/nginx-proxy
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+    ports:
+      # HTTP/HTTPS
+      - "80:80"
+      # FIXME: enable SSL support - https://github.com/jwilder/nginx-proxy#ssl-support-using-letsencrypt
+      #- "443:443"
+    depends_on:
+      - amqp
+    networks:
+      selfhosted:
+        ipv4_address: 172.16.33.100
+
+networks:
+  selfhosted:
+    ipam:
+      config:
+      - subnet: 172.16.33.0/24
+
+volumes:
+  userdb:
+  userschema:
+  ovpn-data:
+  redis:
+  rabbitmq:
+  postgresql:
+  maildata:
+  mailstate:
+  letsencrypt:
+  webmaildata:
+  webmailkeys:
+  chatdata:
+  meetdata:
+  gitea:
+  cidata:
+  cryptpaddata:
+  wikidata:
+  calendardata:
+  calendarconfig:
+  mssql:
+  bitwardencore:
+  bitwardenweb:
+  bitwardenattachments:
+  bitwardencerts:
+  bitwardenidentity:
+  bitwardennginx:
+  seafiledata:
+  redminedata:
+  redminesecrets:
