@@ -1,0 +1,43 @@
+{
+    "rabbit_version": "3.7.8",
+    "users": [
+        {
+            "name": "admin",
+            "password_hash": "wx7XXmAhE/QIk5P8tM/hzyHWvdPwf9bf5cqgKeYiV+ax0pjz",
+            "hashing_algorithm": "rabbit_password_hashing_sha256",
+            "tags": "administrator"
+        },
+        {
+            "name": "zulip",
+            "password_hash": "cGFRxGWtKvF5MSuVb0pJM7D6pCVZ70xmxpOTpyffdTv7YuUU",
+            "hashing_algorithm": "rabbit_password_hashing_sha256",
+            "tags": ""
+        }
+    ],
+    "vhosts": [
+        {
+            "name": "\/"
+        }
+    ],
+    "permissions": [
+        {
+            "user": "admin",
+            "vhost": "\/",
+            "configure": ".*",
+            "write": ".*",
+            "read": ".*"
+        },
+        {
+            "user": "zulip",
+            "vhost": "\/",
+            "configure": ".*",
+            "write": ".*",
+            "read": ".*"
+        }
+    ],
+    "parameters": [],
+    "policies": [],
+    "queues": [],
+    "exchanges": [],
+    "bindings": []
+}

@@ -38,3 +38,8 @@ Docker image management - https://portainer.io/
 Instapaper reading list - Wallabag
 Forum - Discourse
 Remote Desktop - https://guacamole.apache.org/
+
+
+Hosts file
+
+127.0.0.1	amqp.glicsoft.com	chat.glicsoft.com	meet.glicsoft.com	ci.glicsoft.com	docs.glicsoft.com	wiki.glicsoft.com	calendar.glicsoft.com	passwords.glicsoft.com	projects.glicsoft.com	files.glicsoft.com

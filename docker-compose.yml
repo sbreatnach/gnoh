@@ -1,13 +1,26 @@
 version: "3"
 services:
+  # user data
+  ldap:
+    image: osixia/openldap:1.2.2
+    ports:
+      - "389:389"
+      - "689:689"
+    volumes:
+      - userdb:/var/lib/ldap
+      - userschema:/etc/ldap/slapd.d
+    networks:
+      selfhosted:
+        ipv4_address: 172.16.33.18
+
   # Message Bus
   amqp:
-    image: rabbitmq:3.7.7-alpine
+    image: sbreatnach/rabbitmq-3.7.8-extended:1.0.0
     environment:
-      RABBITMQ_DEFAULT_USER: admin
-      RABBITMQ_DEFAULT_PASS: admin
       VIRTUAL_HOST: amqp.glicsoft.com
       VIRTUAL_PORT: 15672
+    ports:
+      - "15672:15672"
     volumes:
       - rabbitmq:/var/lib/rabbitmq
       - ./rabbitmq/config/enabled_plugins:/etc/rabbitmq/enabled_plugins
@@ -19,11 +32,11 @@ services:
   database:
     image: sbreatnach/postgresql-9.6-extended:1.0.0
     environment:
-      POSTGRES_DB: zulip
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     volumes:
       - postgresql:/var/lib/postgresql/data
+      - ./postgresql/init:/docker-entrypoint-initdb.d
     networks:
       selfhosted:
         ipv4_address: 172.16.33.11
@@ -46,15 +59,15 @@ services:
       VIRTUAL_HOST: chat.glicsoft.com
       DB_HOST: database
       DB_HOST_PORT: 5432
-      DB_USER: postgres
+      DISABLE_HTTPS: "True"
       SSL_CERTIFICATE_GENERATION: self-signed
       SETTING_MEMCACHED_LOCATION: memcached:11211
       SETTING_RABBITMQ_HOST: amqp
       SETTING_REDIS_HOST: redis
       SECRETS_email_password: admin
-      SECRETS_rabbitmq_password: admin
-      SECRETS_postgres_password: postgres
-      SECRETS_secret_key: basd7738473bfsf7834873bfs&&^*fs
+      SECRETS_rabbitmq_password: zulip
+      SECRETS_postgres_password: zulip
+      SECRETS_secret_key: basd7738473bfsf7834873bfs&&&(fs
       SETTING_EXTERNAL_HOST: chat.glicsoft.com
       SETTING_ZULIP_ADMINISTRATOR: admin@glicsoft.com
       SETTING_EMAIL_HOST: mailserver
@@ -146,18 +159,6 @@ services:
     networks:
       selfhosted:
         ipv4_address: 172.16.33.17
-
-  ldap:
-    image: osixia/openldap:1.2.2
-    ports:
-      - "389:389"
-      - "689:689"
-    volumes:
-      - userdb:/var/lib/ldap
-      - userschema:/etc/ldap/slapd.d
-    networks:
-      selfhosted:
-        ipv4_address: 172.16.33.18
 
   # Jitsi Meet
   prosody:
@@ -446,6 +447,7 @@ services:
       #- "443:443"
     depends_on:
       - amqp
+      - chat
     networks:
       selfhosted:
         ipv4_address: 172.16.33.100
