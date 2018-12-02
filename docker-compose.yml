@@ -1,17 +1,20 @@
-version: "3"
+version: "3.7"
 services:
   # user data
   ldap:
     image: osixia/openldap:1.2.2
-    ports:
-      - "389:389"
-      - "689:689"
+    environment:
+      LDAP_ORGANISATION: Glicsoft
+      LDAP_DOMAIN: glicsoft.com
+      LDAP_ADMIN_PASSWORD: admin
+      LDAP_CONFIG_PASSWORD: config
+      LDAP_TLS: "false"
+    command:
+      - "--copy-service"
     volumes:
       - userdb:/var/lib/ldap
       - userschema:/etc/ldap/slapd.d
-    networks:
-      selfhosted:
-        ipv4_address: 172.16.33.18
+      - ./ldap/config:/container/service/slapd/assets/config/bootstrap/ldif/custom
 
   # Message Bus
   amqp:
@@ -24,9 +27,6 @@ services:
     volumes:
       - rabbitmq:/var/lib/rabbitmq
       - ./rabbitmq/config/enabled_plugins:/etc/rabbitmq/enabled_plugins
-    networks:
-      selfhosted:
-        ipv4_address: 172.16.33.10
 
   # Data stores
   database:
@@ -37,21 +37,27 @@ services:
     volumes:
       - postgresql:/var/lib/postgresql/data
       - ./postgresql/init:/docker-entrypoint-initdb.d
-    networks:
-      selfhosted:
-        ipv4_address: 172.16.33.11
   memcached:
     image: memcached:1.5.12-alpine
-    networks:
-      selfhosted:
-        ipv4_address: 172.16.33.12
   redis:
     image: redis:4.0.11-alpine
     volumes:
       - redis
-    networks:
-      selfhosted:
-        ipv4_address: 172.16.33.13
+
+  keycloak:
+    image: jboss/keycloak:4.6.0.Final
+    environment:
+      VIRTUAL_HOST: keycloak.glicsoft.com
+      VIRTUAL_PORT: 8080
+      KEYCLOAK_USER: admin
+      KEYCLOAK_PASSWORD: admin
+      DB_VENDOR: postgres
+      DB_ADDR: database
+      DB_USER: keycloak
+      DB_PASSWORD: keycloak
+      PROXY_ADDRESS_FORWARDING: "true"
+    depends_on:
+      - database
 
   chat:
     image: zulip/docker-zulip:1.9.0-0
@@ -83,9 +89,6 @@ services:
       - chatdata:/data
     depends_on:
       - database
-    networks:
-      selfhosted:
-        ipv4_address: 172.16.33.14
 
   # Mail
   webmail:
@@ -96,9 +99,6 @@ services:
     volumes:
       - webmaildata:/root/.local/share/Mailpile
       - webmailkeys:/root/.gnupg
-    networks:
-      selfhosted:
-        ipv4_address: 172.16.33.15
   mailserver:
     image: tvial/docker-mailserver:release-v6.1.0
     hostname: mail
@@ -144,9 +144,6 @@ services:
     cap_add:
       - NET_ADMIN
       - SYS_PTRACE
-    networks:
-      selfhosted:
-        ipv4_address: 172.16.33.16
 
   openvpn:
     image: kylemanna/openvpn:2.3
@@ -156,9 +153,6 @@ services:
       - NET_ADMIN
     volumes:
       - ovpn-data:/etc/openvpn
-    networks:
-      selfhosted:
-        ipv4_address: 172.16.33.17
 
   # Jitsi Meet
   prosody:
@@ -170,9 +164,6 @@ services:
       - JITSI_VIDEO_PASS=secret1
       - JICOFO_PASS=secret2
       - JICOFO_USER_PASS=secret3
-    networks:
-      selfhosted:
-        ipv4_address: 172.16.33.19
   jicofo:
     image: tiredofit/jitsi-jicofo
     volumes:
@@ -182,9 +173,6 @@ services:
       - HOST=meet.glicsoft.com
       - JICOFO_PASS=secret2
       - JICOFO_USER_PASS=secret3
-    networks:
-      selfhosted:
-        ipv4_address: 172.16.33.20
   videobridge:
     image: tiredofit/jitsi-videobridge
     ports:
@@ -198,9 +186,6 @@ services:
       - ENABLE_ZABBIX=FALSE
       - JITSI_VIDEO_PASS=secret1
       - NETWORK_MODE=NAT
-    networks:
-      selfhosted:
-        ipv4_address: 172.16.33.21
   meet:
     image: tiredofit/jitsi-meet
     volumes:
@@ -214,9 +199,6 @@ services:
       - JICOFO_PASS=secret2
       - JICOFO_USER_PASS=secret3
       - PROSODY_HOST=prosody
-    networks:
-      selfhosted:
-        ipv4_address: 172.16.33.22
 
   gitea:
     image: gitea/gitea:1.6
@@ -238,9 +220,6 @@ services:
       VIRTUAL_PORT: 3000
     depends_on:
       - database
-    networks:
-      selfhosted:
-        ipv4_address: 172.16.33.23
 
   drone:
     image: drone/drone:1.0.0-rc.1
@@ -255,9 +234,6 @@ services:
       - DRONE_SERVER_HOST=drone
       - DRONE_SERVER_PROTO=http
       - DRONE_TLS_AUTOCERT=false
-    networks:
-      selfhosted:
-        ipv4_address: 172.16.33.24
 
   cryptpad:
     # FIXME: get newer, official version
@@ -267,9 +243,6 @@ services:
     environment:
       VIRTUAL_HOST: docs.glicsoft.com
       VIRTUAL_PORT: 3000
-    networks:
-      selfhosted:
-        ipv4_address: 172.16.33.25
 
   wiki:
     image: marcelhuberfoo/pandoc-gitit:1.17.2_0.12.1.1-8-gfe50da5
@@ -280,9 +253,6 @@ services:
       - VIRTUAL_PORT=5001
       - GIT_COMMITTER_NAME="User Name"
       - GIT_COMMITTER_EMAIL="user@domain.com"
-    networks:
-      selfhosted:
-        ipv4_address: 172.16.33.26
 
   calendar:
     image: giorgioazzinnaro/ccs-calendarserver:release_CalendarServer-9.3-dev
@@ -300,9 +270,6 @@ services:
       - MEMCACHED_PORT=11211
     depends_on:
       - database
-    networks:
-      selfhosted:
-        ipv4_address: 172.16.33.27
 
   # Bitwarden
   mssql:
@@ -316,9 +283,6 @@ services:
     #  - mssql.env
     #  - ../env/uid.env
     #  - ../env/mssql.override.env
-    networks:
-      selfhosted:
-        ipv4_address: 172.16.33.28
   web:
     image: bitwarden/web:2.5.0
     container_name: bitwarden-web
@@ -329,9 +293,6 @@ services:
     #env_file:
     #  - global.env
     #  - ../env/uid.env
-    networks:
-      selfhosted:
-        ipv4_address: 172.16.33.29
   attachments:
     image: bitwarden/attachments:1.27.0
     container_name: bitwarden-attachments
@@ -340,9 +301,6 @@ services:
     #env_file:
     #  - global.env
     #  - ../env/uid.env
-    networks:
-      selfhosted:
-        ipv4_address: 172.16.33.30
   api:
     image: bitwarden/api:1.27.0
     container_name: bitwarden-api
@@ -354,9 +312,6 @@ services:
     #  - global.env
     #  - ../env/uid.env
     #  - ../env/global.override.env
-    networks:
-      selfhosted:
-        ipv4_address: 172.16.33.31
   identity:
     image: bitwarden/identity:1.27.0
     container_name: bitwarden-identity
@@ -369,9 +324,6 @@ services:
     #  - global.env
     #  - ../env/uid.env
     #  - ../env/global.override.env
-    networks:
-      selfhosted:
-        ipv4_address: 172.16.33.32
   admin:
     image: bitwarden/admin:1.27.0
     container_name: bitwarden-admin
@@ -383,9 +335,6 @@ services:
     #  - global.env
     #  - ../env/uid.env
     #  - ../env/global.override.env
-    networks:
-      selfhosted:
-        ipv4_address: 172.16.33.33
   icons:
     image: bitwarden/icons:1.27.0
     container_name: bitwarden-icons
@@ -395,9 +344,6 @@ services:
     #env_file:
     #  - global.env
     #  - ../env/uid.env
-    networks:
-      selfhosted:
-        ipv4_address: 172.16.33.34
   notifications:
     image: bitwarden/notifications:1.27.0
     container_name: bitwarden-notifications
@@ -408,9 +354,6 @@ services:
     #  - global.env
     #  - ../env/uid.env
     #  - ../env/global.override.env
-    networks:
-      selfhosted:
-        ipv4_address: 172.16.33.35
 
   redmine:
     image: redmine:3.4.6
@@ -445,18 +388,6 @@ services:
       - "80:80"
       # FIXME: enable SSL support - https://github.com/jwilder/nginx-proxy#ssl-support-using-letsencrypt
       #- "443:443"
-    depends_on:
-      - amqp
-      - chat
-    networks:
-      selfhosted:
-        ipv4_address: 172.16.33.100
-
-networks:
-  selfhosted:
-    ipam:
-      config:
-      - subnet: 172.16.33.0/24
 
 volumes:
   userdb:

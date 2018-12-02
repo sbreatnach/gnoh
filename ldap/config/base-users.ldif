@@ -1,0 +1,15 @@
+dn: ou=People,dc=glicsoft,dc=com
+objectclass: top
+objectclass: organizationalUnit
+ou: People
+
+dn: uid=mpower,ou=People,dc=glicsoft,dc=com
+objectclass: top
+objectclass: person
+objectclass: organizationalPerson
+objectclass: inetOrgPerson
+uid: mpower
+cn: Max
+sn: Power
+mail: mpower@glicsoft.com
+userPassword: {SSHA}juXOdnLqEJv33mKsTDiRKNIS+bltJuxX
