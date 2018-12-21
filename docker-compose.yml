@@ -82,7 +82,14 @@ services:
       # It seems that the email server needs to use ssl or tls and can't be used without it
       SETTING_EMAIL_USE_SSL: "False"
       SETTING_EMAIL_USE_TLS: "True"
-      ZULIP_AUTH_BACKENDS: EmailAuthBackend
+      ZULIP_AUTH_BACKENDS: "ZulipLDAPAuthBackend"
+      SETTING_AUTH_LDAP_SERVER_URI: "ldap://ldap"
+      SETTING_AUTH_LDAP_BIND_DN: "cn=admin,dc=glicsoft,dc=com"
+      SECRETS_auth_ldap_bind_password: "admin"
+      SETTING_AUTH_LDAP_USER_SEARCH: 'LDAPSearch("ou=People,dc=glicsoft,dc=com", ldap.SCOPE_SUBTREE, "(uid=%(user)s)")'
+      SETTING_LDAP_APPEND_DOMAIN: None
+      SETTING_LDAP_EMAIL_ATTR: "mail"
+      SETTING_AUTH_LDAP_USER_ATTR_MAP: '{ "first_name": "cn", "last_name": "sn", "email": "mail" }'
       # Uncomment this when configuring the mobile push notifications service
       # SETTING_PUSH_NOTIFICATION_BOUNCER_URL: 'https://push.zulipchat.com'
     volumes:
